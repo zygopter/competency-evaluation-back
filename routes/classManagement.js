@@ -24,16 +24,23 @@ const generateClassCode = async () => {
 // Créer une nouvelle classe
 router.post('/', authenticateToken, isTeacher, async (req, res) => {
   try {
-    const { name } = req.body;
+    console.log('Received request to create class:', req.body);
+    console.log('User creating class:', req.user);
+    const { name, year } = req.body;
     const newClass = new ClassModel({
       name,
+      year,
       teacher: req.user.id,
       code: await generateClassCode()
     });
     await newClass.save();
     res.status(201).json(newClass);
   } catch (error) {
-    res.status(500).json({ message: "Erreur lors de la création de la classe" });
+    res.status(500).json({ 
+      message: "Erreur lors de la création de la classe", 
+      error: error.message,
+      stack: error.stack // Ceci aidera à identifier la source exacte de l'erreur
+    });
   }
 });
 
@@ -56,6 +63,29 @@ router.delete('/:classId', authenticateToken, isTeacher, async (req, res) => {
     res.json({ message: "Classe supprimée avec succès" });
   } catch (error) {
     res.status(500).json({ message: "Erreur lors de la suppression de la classe" });
+  }
+});
+
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    console.log('Received request to fetch classes for user:', userId);
+    console.log('User creating class is a ', userRole);
+
+    let classes;
+    if (userRole === 'teacher') {
+      classes = await ClassModel.find({ teacher: userId });
+    } else if (userRole === 'student') {
+      classes = await ClassModel.find({ 'students.user': userId });
+    } else {
+      return res.status(403).json({ message: "Rôle d'utilisateur non autorisé" });
+    }
+    
+    res.json(classes);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des classes:', error);
+    res.status(500).json({ message: "Erreur lors de la récupération des classes", error: error.message });
   }
 });
 
