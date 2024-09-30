@@ -143,6 +143,23 @@ router.post('/:classId/students', authenticateToken, isTeacher, async (req, res)
   }
 });
 
+// Get all students of a class by Class Id
+router.get('/:classId/students', async (req, res) => {
+  try {
+    const classId = req.params.classId;
+    const classObj = await ClassModel.findById(classId);
+    if (!classObj) {
+      return res.status(404).json({ message: "Classe non trouvée" });
+    }
+
+    const students = await StudentModel.find({ _id: { $in: classObj.students } });
+    res.json(students);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des étudiants:', error);
+    res.status(500).json({ message: "Erreur lors de la récupération des étudiants", error: error.message });
+  }
+});
+
 // Permettre à un élève de rejoindre une classe avec un code
 router.post('/join', authenticateToken, async (req, res) => {
   try {
