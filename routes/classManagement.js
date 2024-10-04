@@ -76,8 +76,22 @@ router.get('/', authenticateToken, async (req, res) => {
     let classes;
     if (userRole === 'teacher') {
       classes = await ClassModel.find({ teacher: userId });
+      console.log('Fetching class for teacher: ', classes);
     } else if (userRole === 'student') {
-      classes = await ClassModel.find({ 'students.user': userId });
+      // Trouver d'abord les students associés à l'utilisateur
+      const students = await StudentModel.find({ user: userId });
+      console.log('Found students for user:', students.length);
+
+      if (students.length === 0) {
+        return res.json([]);  // Aucun student trouvé pour cet utilisateur
+      }
+
+      // Récupérer les IDs des students
+      const studentIds = students.map(student => student._id);
+
+      // Trouver les classes qui contiennent ces students
+      classes = await ClassModel.find({ students: { $in: studentIds } });
+      console.log('Fetching classes for student: ', classes);
     } else {
       return res.status(403).json({ message: "Rôle d'utilisateur non autorisé" });
     }
@@ -143,6 +157,32 @@ router.post('/:classId/students', authenticateToken, isTeacher, async (req, res)
   }
 });
 
+// Get all classes for one student (UserModel)
+router.get('/:studentId/classes', authenticateToken, async (req, res) => {
+  try {
+      const { studentId } = req.params;
+
+      // Vérifiez si l'utilisateur authentifié est l'étudiant demandé ou un administrateur
+      if (req.user.id !== studentId) {
+          return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const classes = await ClassModel.find({ _id: { $in: student.classes } });
+
+      if (!student) {
+          return res.status(404).json({ message: "Étudiant non trouvé" });
+      }
+
+      // Si student.classes est un tableau d'IDs, utilisez cette méthode à la place :
+      // const classes = await Class.find({ _id: { $in: student.classes } });
+
+      res.json(student.classes);
+  } catch (error) {
+      console.error("Erreur lors de la récupération des classes de l'étudiant:", error);
+      res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
 // Get all students of a class by Class Id
 router.get('/:classId/students', async (req, res) => {
   try {
@@ -160,11 +200,34 @@ router.get('/:classId/students', async (req, res) => {
   }
 });
 
+// Route pour rechercher des élèves dans une classe
+router.get('/search-students', async (req, res) => {
+  try {
+      const { classCode, lastNamePrefix } = req.query;
+
+      const classToSearch = await ClassModel.findOne({ code: classCode });
+      if (!classToSearch) {
+          return res.status(404).json({ message: "Classe non trouvée" });
+      }
+
+      const matchingStudents = await StudentModel.find({
+          _id: { $in: classToSearch.students },
+          lastName: new RegExp(`^${lastNamePrefix}`, 'i')
+      }).select('id firstName lastName');
+
+      res.json(matchingStudents);
+  } catch (error) {
+      console.error("Erreur lors de la recherche d'élèves:", error);
+      res.status(500).json({ message: "Erreur serveur lors de la recherche d'élèves" });
+  }
+});
+
 // Permettre à un élève de rejoindre une classe avec un code
 router.post('/join', authenticateToken, async (req, res) => {
   try {
     const { classCode, firstName, lastName } = req.body;
     const userId = req.user.id;
+    console.log('Received request to join class for user:', userId);
 
     const classToJoin = await ClassModel.findOne({ code: classCode });
     if (!classToJoin) {
@@ -174,9 +237,9 @@ router.post('/join', authenticateToken, async (req, res) => {
     const student = await StudentModel.findOne({
       class: classToJoin._id,
       firstName,
-      lastName,
-      user: null
+      lastName
     });
+    console.log('Received request to join class for user:', userId);
 
     if (!student) {
       return res.status(404).json({ message: "Étudiant non trouvé dans cette classe" });
@@ -185,7 +248,7 @@ router.post('/join', authenticateToken, async (req, res) => {
     student.user = userId;
     await student.save();
 
-    res.json({ message: "Vous avez rejoint la classe avec succès" });
+    res.status(201).json(classToJoin);
   } catch (error) {
     res.status(500).json({ message: "Erreur lors de la tentative de rejoindre la classe", error: error.message });
   }
