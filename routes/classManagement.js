@@ -5,6 +5,7 @@ const UserModel = require('../models/User');
 const StudentModel = require('../models/Student');
 const authenticateToken = require('../middleware/auth');
 const isTeacher = require('../middleware/isTeacher');
+const { generateUniqueClassCode } = require('../utils/codeGenerator');
 const crypto = require('crypto');
 
 // Générer un code unique pour une classe
@@ -26,12 +27,15 @@ router.post('/', authenticateToken, isTeacher, async (req, res) => {
   try {
     console.log('Received request to create class:', req.body);
     console.log('User creating class:', req.user);
+
+    const code = await generateUniqueClassCode(ClassModel);
+
     const { name, year } = req.body;
     const newClass = new ClassModel({
       name,
       year,
       teacher: req.user.id,
-      code: await generateClassCode()
+      code
     });
     await newClass.save();
     res.status(201).json(newClass);
