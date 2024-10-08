@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const classRoutes = require('./routes/classesRoutes');
 const competenceRoutes = require('./routes/competencesRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const formulaireRoutes = require('./routes/formsRoutes');
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/competences', competenceRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/formulaires', formulaireRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
